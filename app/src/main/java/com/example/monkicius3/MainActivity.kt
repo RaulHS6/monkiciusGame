@@ -1,6 +1,7 @@
 package com.example.monkicius3
 
 import android.os.Bundle
+import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
@@ -19,14 +20,25 @@ import androidx.compose.runtime.*
 import kotlin.math.roundToInt
 import androidx.compose.ui.platform.LocalContext
 import android.content.Context
-import android.view.WindowManager
-import androidx.compose.foundation.layout.offset
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.platform.LocalConfiguration
+import android.util.DisplayMetrics
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Modo pantalla completa para versiones anteriores a Android 11 (API 21)
+        @Suppress("DEPRECATION")
+        window.decorView.systemUiVisibility = (
+                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                        or View.SYSTEM_UI_FLAG_FULLSCREEN
+                        or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                )
+
         setContent {
             Monkicius3Theme {
                 MonkeyMover()
@@ -41,9 +53,12 @@ fun MonkeyMover() {
     var offsetY by remember { mutableStateOf(0f) }
 
     val context = LocalContext.current
-    val configuration = LocalConfiguration.current
-    val screenWidth = configuration.screenWidthDp.dp
-    val screenHeight = configuration.screenHeightDp.dp
+    val displayMetrics = context.resources.displayMetrics
+    val screenWidth = displayMetrics.widthPixels.toFloat()
+    val screenHeight = displayMetrics.heightPixels.toFloat()
+
+    // Tamaño del mono reducido a la mitad
+    val monkeySize = 100f // Suponiendo que el tamaño original era 200px
 
     val sensorManager = remember { context.getSystemService(Context.SENSOR_SERVICE) as SensorManager }
     val accelerometer = remember { sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) }
@@ -52,17 +67,18 @@ fun MonkeyMover() {
         object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent?) {
                 event?.let {
-                    // Actualiza la posición pero limita el movimiento a los bordes de la pantalla
-                    val newX = offsetX + (-it.values[0] * 5)
-                    val newY = offsetY + (it.values[1] * 5)
+                    // Ajuste de la posición basado en los valores del acelerómetro
+                    val newX = offsetX + (-it.values[0] * 10)
+                    val newY = offsetY + (it.values[1] * 10)
 
-                    offsetX = newX.coerceIn(0f, screenWidth.value)
-                    offsetY = newY.coerceIn(0f, screenHeight.value)
+                    // Centrar el mono dentro de los límites de la pantalla
+                    offsetX = newX.coerceIn(-(monkeySize / 2), screenWidth - (monkeySize / 2))
+                    offsetY = newY.coerceIn(-(monkeySize / 2), screenHeight - (monkeySize / 2))
                 }
             }
 
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-                // No necesitamos manejar cambios en la precisión del sensor para este caso
+                // No se necesita manejar cambios en la precisión del sensor para este caso
             }
         }
     }
@@ -79,7 +95,9 @@ fun MonkeyMover() {
             painter = painterResource(id = R.drawable.alex),
             contentDescription = "Monkey Alex",
             modifier = Modifier
-                .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
+                .graphicsLayer(translationX = offsetX, translationY = offsetY)
+                .scale(0.5f), // Escala al 50% del tamaño original
+            contentScale = ContentScale.FillBounds
         )
     }
 }
